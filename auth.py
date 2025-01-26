@@ -1,8 +1,12 @@
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, request, jsonify
 from flask_cors import CORS
-import re
 import firebase_admin
 from firebase_admin import credentials, auth, db
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Initialize Firebase app
 cred = credentials.Certificate("serviceAccountKey.json")
@@ -48,9 +52,6 @@ def get_user_progress(user_id):
 # Test endpoint to save user progress
 @app.route('/test/save_progress', methods=['POST'])
 def test_save_progress():
-    # Log the request body for debugging
-    print(f"Request data: {request.data}")
-    print(f"JSON payload: {request.json}")
     user_id = request.json.get('user_id')
     progress = request.json.get('progress')
     try:
@@ -69,7 +70,8 @@ def test_get_progress(user_id):
         return jsonify({"message": "No progress found for this user."}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    
+
+# Endpoint to fetch questions by topic and difficulty
 @app.route('/questions', methods=['GET'])
 def get_questions():
     topic = request.args.get('topic')  # e.g., "Fractions"
@@ -82,7 +84,8 @@ def get_questions():
         return jsonify(filtered), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    
+
+# Endpoint to fetch a specific question by its ID
 @app.route('/questions/<question_id>', methods=['GET'])
 def get_question_by_id(question_id):
     try:
@@ -95,5 +98,49 @@ def get_question_by_id(question_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# Endpoint to generate a question using AI
+@app.route('/generate_question', methods=['POST'])
+def generate_question():
+    print("Endpoint /generate_question has been called.")
+    import openai
+
+    # Use the API key
+    openai.api_key = os.getenv("OPENAI_API_KEY")
+
+    # Add this print statement to confirm the API key being used
+    print("OpenAI API Key:", os.getenv("OPENAI_API_KEY"))
+
+    data = request.json
+    topic = data.get("topic", "Math")
+    difficulty = data.get("difficulty", "Easy")
+
+    try:
+        # Updated prompt for the new API
+        prompt = f"Create a {difficulty} level multiple-choice question about {topic}. Include four options and specify the correct answer."
+
+        # Use the new ChatCompletion API
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant for generating quiz questions."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+
+        # Extract the content of the response
+        question_text = response.choices[0].message["content"].strip()
+
+        # Parse the response into a question structure
+        lines = question_text.split("\n")
+        question = {
+            "question": lines[0],  # First line as the question
+            "options": lines[1:5],  # Next 4 lines as options
+            "answer": lines[5] if len(lines) > 5 else "Option 1"  # Optional: parse the correct answer
+        }
+        return jsonify(question), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5003)
