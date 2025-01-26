@@ -4,6 +4,7 @@ import firebase_admin
 from firebase_admin import credentials, auth, db
 import os
 from dotenv import load_dotenv
+import random
 
 # Load environment variables from .env file
 load_dotenv()
@@ -17,129 +18,73 @@ firebase_admin.initialize_app(cred, {
 app = Flask(__name__)
 CORS(app)  # Allow all origins by default
 
-# Default route for the root URL
-@app.route('/', methods=['GET'])
-def home():
-    return jsonify({"message": "Welcome to the Adaptive Learning API!"}), 200
+# List of common math topics
+MATH_TOPICS = ["Fractions", "Decimals and Percentages", "Ratios and Proportions", "Geometry", "Basic Algebra"]
 
-# Handle requests for favicon.ico
-@app.route('/favicon.ico')
-def favicon():
-    return '', 204  # No content response for favicon.ico requests
-
-# Endpoint for user signup/login
-@app.route('/login', methods=['POST'])
-def login():
-    token = request.json.get('idToken')
-    try:
-        # Verify the Firebase ID token
-        decoded_token = auth.verify_id_token(token)
-        uid = decoded_token['uid']
-        return jsonify({"message": "Login successful", "uid": uid}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 401
-
-# Example function to write data to the database
-def save_user_progress(user_id, progress):
-    ref = db.reference(f'users/{user_id}/progress')
-    ref.set(progress)
-
-# Example function to read data from the database
-def get_user_progress(user_id):
-    ref = db.reference(f'users/{user_id}/progress')
-    return ref.get()
-
-# Test endpoint to save user progress
-@app.route('/test/save_progress', methods=['POST'])
-def test_save_progress():
-    user_id = request.json.get('user_id')
-    progress = request.json.get('progress')
-    try:
-        save_user_progress(user_id, progress)
-        return jsonify({"message": "Progress saved successfully!"}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-# Test endpoint to get user progress
-@app.route('/test/get_progress/<user_id>', methods=['GET'])
-def test_get_progress(user_id):
-    try:
-        progress = get_user_progress(user_id)
-        if progress:
-            return jsonify(progress), 200
-        return jsonify({"message": "No progress found for this user."}), 404
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-# Endpoint to fetch questions by topic and difficulty
-@app.route('/questions', methods=['GET'])
-def get_questions():
-    topic = request.args.get('topic')  # e.g., "Fractions"
-    difficulty = request.args.get('difficulty')  # e.g., "Easy"
-    try:
-        # Query the questions from Firebase
-        ref = db.reference('questions')
-        questions = ref.order_by_child('topic').equal_to(topic).get()
-        filtered = [q for q in questions.values() if q['difficulty'] == difficulty]
-        return jsonify(filtered), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-# Endpoint to fetch a specific question by its ID
-@app.route('/questions/<question_id>', methods=['GET'])
-def get_question_by_id(question_id):
-    try:
-        # Fetch the question from Firebase using the question_id
-        ref = db.reference(f'questions/{question_id}')
-        question = ref.get()
-        if question:
-            return jsonify(question), 200
-        return jsonify({"message": "Question not found"}), 404
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-# Endpoint to generate a question using AI
 @app.route('/generate_question', methods=['POST'])
 def generate_question():
-    print("Endpoint /generate_question has been called.")
     import openai
+    import json
 
-    # Use the API key
     openai.api_key = os.getenv("OPENAI_API_KEY")
 
-    # Add this print statement to confirm the API key being used
-    print("OpenAI API Key:", os.getenv("OPENAI_API_KEY"))
-
     data = request.json
-    topic = data.get("topic", "Math")
+    topic = data.get("topic", random.choice(MATH_TOPICS))
     difficulty = data.get("difficulty", "Easy")
 
     try:
-        # Updated prompt for the new API
-        prompt = f"Create a {difficulty} level multiple-choice question about {topic}. Include four options and specify the correct answer."
+        # Add randomization for variation
+        random_contexts = [
+            "in a real-world shopping scenario",
+            "while planning a school event",
+            "in a geometry problem involving shapes",
+            "to solve an everyday math problem",
+            "for understanding ratios in a recipe"
+        ]
+        random_context = random.choice(random_contexts)
 
-        # Use the new ChatCompletion API
+        prompt = f"""
+        Create a unique {difficulty}-level multiple-choice question about {topic} {random_context}.
+        Use random numbers and vary the math operations involved to ensure the questions are not repetitive.
+
+        Return ONLY valid JSON with the following structure (and nothing more):
+        {{
+          "question": "<Your question text>",
+          "options": ["A) ...", "B) ...", "C) ...", "D) ..."],
+          "answer": "<One correct option from the above>"
+        }}
+
+        Requirements:
+        1. The question field is a single string.
+        2. Provide exactly four unique answer choices in "options", labeled A), B), C), D).
+        3. Provide exactly one correct answer in the "answer" field.
+        4. Use random or varied numbers so the same question doesn't repeat each time.
+        5. Ensure the 'answer' is always correct for the question.
+        6. No extra commentary or keys—only these three fields: question, options, answer.
+        7. Use the metric system for units (e.g., meters, grams, liters).
+        8. No questions about fractions
+        """
+
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4",  # Use a valid model name like "gpt-4" or "gpt-3.5-turbo"
             messages=[
-                {"role": "system", "content": "You are a helpful assistant for generating quiz questions."},
+                {
+                    "role": "system",
+                    "content": "You are a helpful math tutor. Return ONLY valid JSON with no extra text."
+                },
                 {"role": "user", "content": prompt}
-            ]
+            ],
+            temperature=0.9,  # Increase temperature for more varied responses
         )
 
-        # Extract the content of the response
-        question_text = response.choices[0].message["content"].strip()
+        raw_content = response.choices[0].message["content"].strip()
+        print("Raw API Response:", raw_content)  # Debugging
+        question_obj = json.loads(raw_content)
 
-        # Parse the response into a question structure
-        lines = question_text.split("\n")
-        question = {
-            "question": lines[0],  # First line as the question
-            "options": lines[1:5],  # Next 4 lines as options
-            "answer": lines[5] if len(lines) > 5 else "Option 1"  # Optional: parse the correct answer
-        }
-        return jsonify(question), 200
+        return jsonify(question_obj), 200
 
     except Exception as e:
+        print("Error:", str(e))  # Debugging
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
