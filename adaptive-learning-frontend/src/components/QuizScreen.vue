@@ -1,73 +1,133 @@
 <template>
   <div class="quiz-container">
     <h1>Quiz</h1>
-    <p v-if="loading">Loading quiz...</p>
+
+    <!-- Loading State -->
+    <div v-if="loading">
+      <p>Loading question...</p>
+    </div>
+
+    <!-- Error State -->
+    <div v-else-if="error">
+      <p>{{ error }}</p>
+      <button @click="loadQuestion">Retry</button>
+    </div>
+
+    <!-- Quiz Question & Answers -->
     <div v-else>
-      <p v-if="error">
-        {{ error }}
-        <button @click="fetchQuestion">Retry</button>
-      </p>
-      <div v-else>
-        <h2>{{ question.question }}</h2>
-        <ul v-if="!answeredCorrectly">
-          <li v-for="(option, index) in question.options" :key="index">
-            <button @click="checkAnswer(option)">{{ option }}</button>
-          </li>
-        </ul>
-        <div v-if="answeredCorrectly" class="correct-answer">
-          <p>Correct!</p>
-          <button @click="fetchNextQuestion" class="next-button">Next Question</button>
-        </div>
+      <p><strong>Question: </strong> {{ questionData.question }}</p>
+      <div class="options">
+        <button
+          v-for="(option, index) in questionData.options"
+          :key="index"
+          @click="checkAnswer(option)"
+        >
+          {{ option }}
+        </button>
       </div>
+
+      <!-- Feedback -->
+      <p 
+        v-if="feedback" 
+        :class="{ correct: isCorrect, incorrect: !isCorrect }"
+      >
+        {{ feedback }}
+      </p>
+
+      <!-- Next Question Button -->
+      <button v-if="isCorrect" @click="loadQuestion">
+        Next Question
+      </button>
     </div>
   </div>
 </template>
 
 <script>
-import axios from "axios";
-
 export default {
+  name: 'QuizScreen',
   data() {
     return {
+      questionData: {
+        question: '',
+        options: [],
+        answer: ''
+      },
       loading: true,
       error: null,
-      question: null,
-      questionId: 1, // Start with the first question
-      answeredCorrectly: false,
+      feedback: null,
+      isCorrect: false
     };
   },
   methods: {
-    async fetchQuestion() {
+    async loadQuestion() {
       this.loading = true;
       this.error = null;
-      this.answeredCorrectly = false; // Reset the state for the new question
+      this.feedback = null;
+
       try {
-        const response = await axios.get(
-          `http://127.0.0.1:5000/questions/question_id_${this.questionId}`
-        );
-        this.question = response.data;
+        const response = await fetch("http://127.0.0.1:5003/generate_question", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ topic: "Fractions", difficulty: "Easy" }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to load question");
+        }
+
+        const data = await response.json();
+
+        // If your backend returns something like:
+        // {
+        //   "question": {
+        //     "question": "What is 1/4 of 3/4?",
+        //     "options": [ "A) 1/16", "B) 3/16", ... ],
+        //     "answer": "B) 3/16"
+        //   }
+        // }
+        //
+        // then set questionData to data.question.
+        // Otherwise, if the backend returns:
+        // {
+        //   "question": "What is 1/4 of 3/4?",
+        //   "options": [ "A) 1/16", "B) 3/16", ... ],
+        //   "answer": "B) 3/16"
+        // }
+        // then set questionData to data.
+
+        if (data.question && typeof data.question === 'object') {
+          // Nested object
+          this.questionData = data.question;
+        } else {
+          // Top-level fields
+          this.questionData = data;
+        }
+
+        this.loading = false;
       } catch (err) {
-        console.error("Error fetching question:", err);
         this.error = "Failed to load quiz question. Please try again.";
-      } finally {
         this.loading = false;
       }
     },
+
     checkAnswer(selectedOption) {
-      if (selectedOption === this.question.answer) {
-        this.answeredCorrectly = true; // Mark as correct
+      const normalizedSelected = selectedOption.trim().toLowerCase();
+      const normalizedAnswer = this.questionData.answer.trim().toLowerCase();
+
+      if (normalizedSelected === normalizedAnswer) {
+        this.feedback = "Correct! Well done.";
+        this.isCorrect = true;
       } else {
-        alert("Try again.");
+        this.feedback = "Incorrect. Please try again.";
+        this.isCorrect = false;
       }
-    },
-    fetchNextQuestion() {
-      this.questionId++; // Increment the question ID
-      this.fetchQuestion(); // Fetch the next question
-    },
+    }
   },
-  created() {
-    this.fetchQuestion();
-  },
+  mounted() {
+    this.loadQuestion();
+  }
 };
 </script>
 
@@ -75,56 +135,45 @@ export default {
 .quiz-container {
   max-width: 600px;
   margin: 0 auto;
+  text-align: center;
   padding: 20px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  font-family: Arial, sans-serif;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   background-color: #f9f9f9;
 }
 
-h1 {
-  text-align: center;
-  font-size: 2rem;
-  margin-bottom: 1rem;
-}
-
-h2 {
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
-}
-
-ul {
-  list-style-type: none;
-  padding: 0;
-}
-
-button {
-  display: block;
-  margin: 0.5rem 0;
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
+.options button {
+  display: inline-block;
+  margin: 10px 10px;
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
   background-color: #007bff;
-  color: white;
+  color: #fff;
   border: none;
   border-radius: 5px;
-  cursor: pointer;
   transition: background-color 0.3s ease;
 }
 
-button:hover {
+.options button:hover {
   background-color: #0056b3;
 }
 
-.correct-answer {
-  text-align: center;
+.correct {
+  color: green;
+  font-weight: bold;
   margin-top: 20px;
 }
 
-.next-button {
-  background-color: #28a745;
+.incorrect {
+  color: red;
+  font-weight: bold;
+  margin-top: 20px;
 }
 
-.next-button:hover {
-  background-color: #218838;
+button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
 }
 </style>
