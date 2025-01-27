@@ -113,7 +113,7 @@ export default {
       this.feedbackSubmitted = false; // Reset feedback submission state
 
       try {
-        const response = await fetch("http://127.0.0.1:5003/generate_question", {
+        const response = await fetch("http://127.0.0.1:8080/generate_question", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -155,7 +155,7 @@ export default {
 
     async updateStreak(isCorrect) {
       try {
-        const response = await fetch("http://127.0.0.1:5003/submit_answer", {
+        const response = await fetch("http://127.0.0.1:8080/submit_answer", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -175,7 +175,7 @@ export default {
 
     async submitFeedback(difficulty) {
       try {
-        await fetch("http://127.0.0.1:5003/feedback", {
+        await fetch("http://127.0.0.1:8080/feedback", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
