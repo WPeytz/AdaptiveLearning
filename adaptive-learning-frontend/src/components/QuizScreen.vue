@@ -11,6 +11,12 @@
       </div>
     </div>
 
+    <!-- Correct Streak -->
+    <div class="streak-container">
+      <p class="streak-label">Current Streak:</p>
+      <span class="streak-badge">{{ correctStreak }}</span>
+    </div>
+
     <!-- Loading State -->
     <div v-if="loading" class="loading">
       <p>Loading question...</p>
@@ -32,10 +38,10 @@
           :key="index"
           :class="[
             'option-btn',
-            { 
+            {
               correct: selectedOption === option && isCorrect,
               incorrect: selectedOption === option && !isCorrect,
-              'show-correct': selectedOption !== null && option === questionData.answer && !isCorrect
+              'show-correct': selectedOption !== null && option === questionData.answer && !isCorrect,
             }
           ]"
           @click="checkAnswer(option)"
@@ -54,9 +60,22 @@
         {{ feedback }}
       </p>
 
+      <!-- Difficulty Feedback Buttons -->
+      <div v-if="selectedOption !== null && !feedbackSubmitted" class="feedback-buttons">
+        <p class="feedback-title">How would you rate the question's difficulty?</p>
+        <div class="feedback-buttons-group">
+          <button class="feedback-btn" @click="submitFeedback('Very Easy')">Very Easy</button>
+          <button class="feedback-btn" @click="submitFeedback('Easy')">Easy</button>
+          <button class="feedback-btn" @click="submitFeedback('Medium')">Medium</button>
+          <button class="feedback-btn" @click="submitFeedback('Hard')">Hard</button>
+          <button class="feedback-btn" @click="submitFeedback('Wrong')">Wrong</button>
+          <button class="feedback-btn skip-btn" @click="submitFeedback('Skipped')">Skip</button>
+        </div>
+      </div>
+
       <!-- Next Question Button -->
       <button
-        v-if="selectedOption !== null"
+        v-if="feedbackSubmitted"
         @click="loadQuestion"
         class="next-btn"
       >
@@ -81,6 +100,8 @@ export default {
       feedback: null,
       isCorrect: false,
       selectedOption: null, // Track the user's selected option
+      correctStreak: 0, // Keep track of the correct streak
+      feedbackSubmitted: false, // Track if feedback has been submitted
     };
   },
   methods: {
@@ -89,6 +110,7 @@ export default {
       this.error = null;
       this.feedback = null;
       this.selectedOption = null;
+      this.feedbackSubmitted = false; // Reset feedback submission state
 
       try {
         const response = await fetch("http://127.0.0.1:5003/generate_question", {
@@ -96,7 +118,7 @@ export default {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ topic: "Fractions", difficulty: "Easy" }),
+          body: JSON.stringify({ user_id: "test_user" }),
         });
 
         if (!response.ok) {
@@ -105,6 +127,7 @@ export default {
 
         const data = await response.json();
         this.questionData = data;
+        this.correctStreak = data.correct_streak || 0; // Update the correct streak from the backend
         this.loading = false;
       } catch (err) {
         this.error = "Failed to load quiz question. Please try again.";
@@ -120,11 +143,51 @@ export default {
       const normalizedAnswer = this.questionData.answer.trim().toLowerCase();
 
       if (normalizedSelected === normalizedAnswer) {
-        this.feedback = "Correct! Well done.";
+        //this.feedback = "Correct! Well done.";
         this.isCorrect = true;
+        this.updateStreak(true);
       } else {
-        this.feedback = "Incorrect. Better luck next time!";
+        //this.feedback = "Incorrect. Better luck next time!";
         this.isCorrect = false;
+        this.updateStreak(false);
+      }
+    },
+
+    async updateStreak(isCorrect) {
+      try {
+        const response = await fetch("http://127.0.0.1:5003/submit_answer", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            user_id: "test_user",
+            is_correct: isCorrect,
+          }),
+        });
+
+        const data = await response.json();
+        this.correctStreak = data.correct_streak || 0; // Update the correct streak dynamically
+      } catch (error) {
+        console.error("Failed to update streak:", error);
+      }
+    },
+
+    async submitFeedback(difficulty) {
+      try {
+        await fetch("http://127.0.0.1:5003/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_id: "test_user",
+            question: this.questionData.question,
+            difficulty: difficulty,
+          }),
+        });
+        this.feedbackSubmitted = true; // Mark feedback as submitted
+        console.log(`Feedback '${difficulty}' submitted successfully.`);
+      } catch (error) {
+        console.error("Failed to submit feedback:", error);
       }
     },
 
@@ -307,4 +370,107 @@ export default {
 .next-btn:hover {
   background-color: #0056b3;
 }
+
+/* Styles for Feedback Buttons */
+.feedback-buttons {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.feedback-title {
+  font-size: 1.2rem;
+  margin-bottom: 10px;
+  font-weight: bold;
+}
+
+.feedback-buttons-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.feedback-btn {
+  background-color: #f0f0f0;
+  color: #333;
+  padding: 10px 15px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.feedback-btn:hover {
+  background-color: #007bff;
+  color: white;
+  transform: scale(1.05);
+}
+
+.skip-btn {
+  background-color: #f0f0f0;
+  color: black;
+}
+
+.skip-btn:hover {
+  background-color: #c62828;
+}
+
+/* Next Button */
+.next-btn {
+  margin-top: 20px;
+  padding: 12px 20px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.next-btn:hover {
+  background-color: #218838;
+}
+
+/* Streak Container */
+.streak-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  font-family: 'Arial', sans-serif;
+}
+
+/* Streak Label */
+.streak-label {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin-right: 10px;
+  color: #333;
+}
+
+/* Streak Badge */
+.streak-badge {
+  display: inline-block;
+  background-color: #4caf50; /* Green for success */
+  color: white;
+  font-size: 1.5rem;
+  font-weight: bold;
+  padding: 5px 15px;
+  border-radius: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  /* animation: streak-pulse 1.5s infinite ease-in-out; */
+}
+
+/* Badge Animation */
+@keyframes streak-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
 </style>
