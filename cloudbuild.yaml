@@ -1,0 +1,10 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args:
+    - 'build'
+    - '--platform=linux/amd64'
+    - '-t'
+    - 'gcr.io/adaptivelearning-449114/adaptive-learning'
+    - '.'
+images:
+- 'gcr.io/adaptivelearning-449114/adaptive-learning'
