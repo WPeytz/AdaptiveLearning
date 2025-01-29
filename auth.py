@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import firebase_admin
 from firebase_admin import credentials, db
@@ -6,9 +6,14 @@ import os
 from dotenv import load_dotenv
 import random
 import json
+import openai
 
 # Load environment variables from .env file
 load_dotenv()
+
+# # Verify if the key is loaded
+# print("OPENAI_API_KEY:", os.getenv("OPENAI_API_KEY"))
+# print("GOOGLE_APPLICATION_CREDENTIALS:", os.getenv("GOOGLE_APPLICATION_CREDENTIALS"))
 
 # Initialize Firebase app
 cred = credentials.Certificate("serviceAccountKey.json")
@@ -16,17 +21,24 @@ firebase_admin.initialize_app(cred, {
     'databaseURL': 'https://adaptivelearning-ff09f-default-rtdb.europe-west1.firebasedatabase.app/'
 })
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 CORS(app)  # Allow all origins by default
+
+@app.route('/')
+def serve_index():
+    return send_from_directory(app.static_folder, 'index.html')
 
 # List of common math topics
 MATH_TOPICS = ["Fractions", "Decimals and Percentages", "Ratios and Proportions", "Geometry", "Basic Algebra"]
 
 @app.route('/generate_question', methods=['POST'])
 def generate_question():
-    import openai
+    
+    from openai import OpenAI
 
-    openai.api_key = os.getenv("OPENAI_API_KEY")
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))  # Correct initialization
+
+    print("OpenAI API Key:", os.getenv("OPENAI_API_KEY"))
     data = request.json
     user_id = data.get("user_id", "test_user")
     topic = data.get("topic", random.choice(MATH_TOPICS))
@@ -60,19 +72,17 @@ def generate_question():
         }}
         """
 
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-4",
             messages=[
-                {
-                    "role": "system",
-                    "content": "You are a helpful math tutor. Return ONLY valid JSON with no extra text."
-                },
+                {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.9,
+            max_tokens=200
         )
 
-        raw_content = response.choices[0].message["content"].strip()
+        raw_content = response.choices[0].message.content.strip()
         question_obj = json.loads(raw_content)
 
         # Include the correct streak in the response
@@ -139,4 +149,5 @@ def submit_feedback():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=8080)
+    port = int(os.environ.get("PORT", 8080))  # Use PORT env variable
+    app.run(debug=True, host='0.0.0.0', port=port)

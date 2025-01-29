@@ -1,22 +1,20 @@
-# Use an official Python runtime as a parent image
+# Use a lightweight base image
 FROM python:3.11-slim
 
-# Set the working directory in the container
 WORKDIR /app
 
-# Copy the current directory contents into the container
-COPY . .
-
-# Install any needed packages specified in requirements.txt
+# Copy and install dependencies
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Make port 8080 available to the world outside this container
+# Copy app files
+COPY . .
+
+# Expose port 8080
 EXPOSE 8080
 
-# Define environment variable
-ENV PORT 8080
+# Run the app
+CMD ["python", "auth.py"]
 
 # # Run app.py when the container launches
 # CMD ["python", "main.py"]
-
-CMD ["gunicorn", "-b", "0.0.0.0:$PORT", "auth:app"]
