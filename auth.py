@@ -4,9 +4,10 @@ import firebase_admin
 from firebase_admin import credentials, db
 import os
 from dotenv import load_dotenv
+from google.cloud import secretmanager
 import random
 import json
-import openai
+from openai import OpenAI
 
 # Load environment variables from .env file
 load_dotenv()
@@ -15,8 +16,19 @@ load_dotenv()
 # print("OPENAI_API_KEY:", os.getenv("OPENAI_API_KEY"))
 # print("GOOGLE_APPLICATION_CREDENTIALS:", os.getenv("GOOGLE_APPLICATION_CREDENTIALS"))
 
-# Initialize Firebase app
-cred = credentials.Certificate("serviceAccountKey.json")
+# Fetch service account JSON from Secret Manager
+def get_secret(secret_name):
+    client = secretmanager.SecretManagerServiceClient()
+    project_id = "adaptivelearning-449114"
+    name = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
+    response = client.access_secret_version(name=name)
+    return response.payload.data.decode("UTF-8")
+
+# Load Firebase credentials from Secret Manager
+service_account_json = get_secret("serviceAccountKey")
+
+# Convert string to dictionary and load credentials
+cred = credentials.Certificate(json.loads(service_account_json))  # Directly load from JSON string
 firebase_admin.initialize_app(cred, {
     'databaseURL': 'https://adaptivelearning-ff09f-default-rtdb.europe-west1.firebasedatabase.app/'
 })
@@ -33,24 +45,21 @@ MATH_TOPICS = ["Fractions", "Decimals and Percentages", "Ratios and Proportions"
 
 @app.route('/generate_question', methods=['POST'])
 def generate_question():
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        return jsonify({"error": "Missing OpenAI API key"}), 500  # Handle missing key
+    client = OpenAI(api_key=api_key)
     
-    from openai import OpenAI
-
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))  # Correct initialization
-
-    print("OpenAI API Key:", os.getenv("OPENAI_API_KEY"))
     data = request.json
     user_id = data.get("user_id", "test_user")
     topic = data.get("topic", random.choice(MATH_TOPICS))
     difficulty = data.get("difficulty", "Easy")
 
     try:
-        # Load user performance from Firebase
         user_ref = db.reference(f'performance/{user_id}')
         performance_data = user_ref.get() or {"correct_streak": 0, "incorrect_streak": 0}
         correct_streak = performance_data.get("correct_streak", 0)
 
-        # Add randomization for variation
         random_contexts = [
             "in a real-world shopping scenario",
             "while planning a school event",
@@ -71,23 +80,21 @@ def generate_question():
           "answer": "<One correct option from the above>"
         }}
         """
-
+        
         response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4",  
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.9,
+            temperature=0.7,
             max_tokens=200
         )
 
         raw_content = response.choices[0].message.content.strip()
         question_obj = json.loads(raw_content)
 
-        # Include the correct streak in the response
         question_obj["correct_streak"] = correct_streak
-
         return jsonify(question_obj), 200
 
     except Exception as e:
