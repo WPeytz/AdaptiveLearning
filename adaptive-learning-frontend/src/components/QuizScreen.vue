@@ -2,31 +2,31 @@
   <div class="quiz-container">
     <div class="header">
       <!-- Title -->
-      <h1 class="title">Math Quiz</h1>
+      <h1 class="title">Matematik Quiz</h1>
 
       <!-- Statistics and Log Out Buttons -->
       <div class="header-buttons">
-        <button class="stats-btn" @click="goToStatistics">Statistics</button>
-        <button class="logout-btn" @click="logout">Log Out</button>
+        <button class="stats-btn" @click="goToStatistics">Statistik</button>
+        <button class="logout-btn" @click="logout">Log Ud</button>
       </div>
     </div>
 
     <!-- Correct Streak -->
     <div class="streak-container">
-      <p class="streak-label">Current Streak:</p>
+      <p class="streak-label">Nuværende streak:</p>
       <span class="streak-badge">{{ correctStreak }}</span>
     </div>
 
     <!-- Loading State -->
     <div v-if="loading" class="loading">
-      <p>Loading question...</p>
+      <p>Loader spørgsmål...</p>
       <div class="spinner"></div>
     </div>
 
     <!-- Error State -->
     <div v-else-if="error" class="error">
       <p>{{ error }}</p>
-      <button @click="loadQuestion" class="retry-btn">Retry</button>
+      <button @click="loadQuestion" class="retry-btn">Prøv igen</button>
     </div>
 
     <!-- Quiz Question & Answers -->
@@ -62,14 +62,14 @@
 
       <!-- Difficulty Feedback Buttons -->
       <div v-if="selectedOption !== null && !feedbackSubmitted" class="feedback-buttons">
-        <p class="feedback-title">How would you rate the question's difficulty?</p>
+        <p class="feedback-title">Hvor svært var dette spørgsmål?</p>
         <div class="feedback-buttons-group">
-          <button class="feedback-btn" @click="submitFeedback('Very Easy')">Very Easy</button>
-          <button class="feedback-btn" @click="submitFeedback('Easy')">Easy</button>
+          <button class="feedback-btn" @click="submitFeedback('Very Easy')">Meget nemt</button>
+          <button class="feedback-btn" @click="submitFeedback('Easy')">Nemt</button>
           <button class="feedback-btn" @click="submitFeedback('Medium')">Medium</button>
-          <button class="feedback-btn" @click="submitFeedback('Hard')">Hard</button>
-          <button class="feedback-btn" @click="submitFeedback('Wrong')">Wrong</button>
-          <button class="feedback-btn skip-btn" @click="submitFeedback('Skipped')">Skip</button>
+          <button class="feedback-btn" @click="submitFeedback('Hard')">Svært</button>
+          <button class="feedback-btn" @click="submitFeedback('Wrong')">Forkert</button>
+          <button class="feedback-btn skip-btn" @click="submitFeedback('Skipped')">Spring over</button>
         </div>
       </div>
 
@@ -79,7 +79,7 @@
         @click="loadQuestion"
         class="next-btn"
       >
-        Next Question
+        Næste spørgsmål
       </button>
     </div>
   </div>

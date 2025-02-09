@@ -1,33 +1,23 @@
 <template>
   <div class="login-container">
     <div class="login-box">
-      <h1>Welcome Back!</h1>
-      <p>Please log in to continue to your learning journey.</p>
+      <h1>Velkommen!</h1>
+      <p>Log ind for at fortsætte din læringsrejse.</p>
       <form @submit.prevent="login">
         <div class="form-group">
           <label for="email">Email</label>
-          <input
-            v-model="email"
-            type="email"
-            id="email"
-            placeholder="Enter your email"
-            required
-          />
+          <input v-model="email" type="email" id="email" placeholder="Indtast din email" required />
         </div>
         <div class="form-group">
-          <label for="password">Password</label>
-          <input
-            v-model="password"
-            type="password"
-            id="password"
-            placeholder="Enter your password"
-            required
-          />
+          <label for="password">Adgangskode</label>
+          <input v-model="password" type="password" id="password" placeholder="Indtast din adgangskode" required />
         </div>
-        <button class="login-button" type="submit">Log In</button>
+        <button class="login-button" type="submit" :disabled="loading">
+          {{ loading ? "Logger ind..." : "Log ind" }}
+        </button>
       </form>
       <div class="additional-links">
-        <p>Don't have an account? <button @click="goToSignUp" class="link-button">Sign Up</button></p>
+        <p>Har du ikke en konto? <button @click="goToSignUp" class="link-button">Tilmeld dig</button></p>
       </div>
     </div>
   </div>
@@ -35,6 +25,7 @@
 
 <script>
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+import { getFirestore, doc, getDoc } from "firebase/firestore";
 import firebaseApp from "../firebase";
 
 export default {
@@ -43,23 +34,39 @@ export default {
     return {
       email: "",
       password: "",
+      loading: false, // Added loading state for UI feedback
     };
   },
   methods: {
     async login() {
       const auth = getAuth(firebaseApp);
-      try {
-        const userCredential = await signInWithEmailAndPassword(
-          auth,
-          this.email,
-          this.password
-        );
-        console.log("User logged in:", userCredential.user);
-        this.$router.push("/quiz");
-      } catch (error) {
-        console.error("Login error:", error.message);
-        alert("Login failed: " + error.message);
-      }
+      this.loading = true; // Show loading state
+
+
+        const userCredential = await signInWithEmailAndPassword(auth, this.email, this.password);
+        debugger;
+        const user = userCredential.user;
+        console.log("User logged in:", user);
+
+        // Fetch user role from Firestore
+        const db = getFirestore();
+        const userRef = doc(db, "users", user.uid);
+        const userDoc = await getDoc(userRef);
+
+        if (userDoc.exists()) {
+          const userRole = userDoc.data().role;
+          console.log("User role:", userRole);
+
+          if (userRole === "teacher") {
+            this.$router.push("/teacher-dashboard");
+          } else {
+            this.$router.push("/student-dashboard");
+          }
+        } else {
+          console.error("User data not found in Firestore");
+          alert("Fejl: Brugerdata ikke fundet.");
+        }
+
     },
     goToSignUp() {
       this.$router.push("/signup");
@@ -138,6 +145,11 @@ input {
 
 .login-button:hover {
   background-color: #2a864e;
+}
+
+.login-button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
 }
 
 /* Additional links */

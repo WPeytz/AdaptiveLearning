@@ -1,11 +1,11 @@
 <template>
     <div class="progress-container">
-      <h1>Your Progress</h1>
+      <h1>Dine fremskridt</h1>
       <ul>
         <li v-for="(topic, key) in progress" :key="key">
           <strong>{{ key }}:</strong>
-          <p>Accuracy: {{ topic.accuracy }}%</p>
-          <p>Completed Questions: {{ topic.completed_questions }}</p>
+          <p>Præcision: {{ topic.accuracy }}%</p>
+          <p>Udfyldte spørgsmål: {{ topic.completed_questions }}</p>
         </li>
       </ul>
     </div>
