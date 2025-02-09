@@ -42,6 +42,7 @@ export default {
       const auth = getAuth(firebaseApp);
       this.loading = true; // Show loading state
 
+      try {
 
         const userCredential = await signInWithEmailAndPassword(auth, this.email, this.password);
         debugger;
@@ -66,7 +67,12 @@ export default {
           console.error("User data not found in Firestore");
           alert("Fejl: Brugerdata ikke fundet.");
         }
-
+      } catch (error) {
+        console.error("Login error:", error.message);
+        alert("Login mislykkedes: " + error.message);
+      } finally {
+        this.loading = false; // Reset loading state
+      }
     },
     goToSignUp() {
       this.$router.push("/signup");
